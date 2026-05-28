@@ -1,0 +1,78 @@
+@Library('jsl') _
+
+pipeline {
+    agent any
+
+    parameters {
+        choice(name: 'Environment', choices: ['integration'], description: 'Target environment')
+    }
+
+    environment {
+        PROJECT         = 'persona-connectivity-probe'
+        AWS_REGION      = 'us-east-1'
+        ECRURL_DEV      = '836079437595.dkr.ecr.us-east-1.amazonaws.com/ida'
+        ECRURL_PROD     = '230367374156.dkr.ecr.us-east-1.amazonaws.com/ida'
+        IMAGE_TAG       = "${PROJECT}-${params.Environment}-${BUILD_NUMBER}"
+        CHART_PATH      = 'deployment/chart'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                cleanWs()
+                checkout scm
+            }
+        }
+
+        stage('Docker build') {
+            steps {
+                script {
+                    common.dev_account_ecr_login()
+                    sh """
+                        docker build -t ${ECRURL_DEV}:${IMAGE_TAG} .
+                    """
+                }
+            }
+        }
+
+        stage('Image scan') {
+            steps {
+                script {
+                    common.trivyScan(IMAGE_TAG, env.ECRURL_DEV, 'CRITICAL')
+                }
+            }
+        }
+
+        stage('ECR push') {
+            steps {
+                script {
+                    if (params.Environment == 'production') {
+                        common.dockerpushImagesProd('production', IMAGE_TAG, env.ECRURL_PROD)
+                    } else {
+                        common.dockerpushImagesDev('integration', IMAGE_TAG, env.ECRURL_DEV)
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to EKS') {
+            steps {
+                script {
+                    def kubeContext = 'eks-develop'
+                    def k8sNamespace = 'ida-integration'
+                    def helmEnv = 'integration'
+                    def additionalArgs = '--wait --set image.tag=' + IMAGE_TAG
+
+                    common.kube_helm3_deploy(helmEnv, k8sNamespace, PROJECT, CHART_PATH, kubeContext, additionalArgs)
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh "docker rmi ${ECRURL_DEV}:${IMAGE_TAG} || true"
+            cleanWs()
+        }
+    }
+}

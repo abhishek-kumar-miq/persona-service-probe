@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "persona-connectivity-probe.fullname" . }}
+  labels:
+{{ include "persona-connectivity-probe.labels" . | indent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "persona-connectivity-probe.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "persona-connectivity-probe.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        sidecar.istio.io/inject: "{{ .Values.istio.enabled }}"
+      {{- with .Values.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ template "persona-connectivity-probe.serviceAccountName" . }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command:
+            - sh
+            - -c
+            - |
+              if [ -f /vault/secrets/secrets.properties ]; then
+                set -a
+                . /vault/secrets/secrets.properties
+                set +a
+              fi
+              exec python -m probe.main
+          envFrom:
+            - configMapRef:
+                name: {{ include "persona-connectivity-probe.fullname" . }}-environment
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

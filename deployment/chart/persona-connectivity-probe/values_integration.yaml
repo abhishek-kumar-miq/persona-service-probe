@@ -1,0 +1,43 @@
+replicaCount: 1
+image:
+  repository: 836079437595.dkr.ecr.us-east-1.amazonaws.com/ida
+  tag: persona-connectivity-probe
+  pullPolicy: Always
+nameOverride: ''
+fullnameOverride: persona-connectivity-probe
+serviceAccount:
+  create: false
+  name: audience-manager-service
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+annotations:
+  prometheus.io/team: IDA
+  prometheus.io/product: PRECAMPAIGN
+  prometheus.io/service: PERSONA_CONNECTIVITY_PROBE
+  prometheus.io/env: INTEGRATION
+  vault.hashicorp.com/auth-path: auth/kubernetes
+  vault.hashicorp.com/role: ida-integration
+  vault.hashicorp.com/agent-inject-secret-secrets.properties: IDA-Vault-Kubernetes/data/audience-persona-service
+  vault.hashicorp.com/agent-inject-template-secrets.properties: >
+    {{- with secret
+    "IDA-Vault-Kubernetes/data/audience-persona-service" }}
+      {{ range $k, $v := .Data.data }}
+        {{- $k }}={{ $v }}
+      {{ end }}
+    {{- end }}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+env:
+  PERSONA_SERVICE_URL: http://miq-persona-service.ida-integration.svc.cluster.local
+  EMBEDDING_SERVICE_URL: http://miq-persona-embedding-service-integration.ida-integration.svc.cluster.local/miq-persona-embedding-service
+  PROBE_INTERVAL_SECONDS: '300'
+  PROBE_HTTP_TIMEOUT_SECONDS: '120'
+  PERSONA_API_PREFIX: audience-query/api
+istio:
+  enabled: false

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "persona-connectivity-probe.fullname" . }}-environment
+  labels:
+    app.kubernetes.io/name: {{ include "persona-connectivity-probe.name" . }}
+    helm.sh/chart: {{ include "persona-connectivity-probe.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+{{ toYaml .Values.env | indent 2 }}
