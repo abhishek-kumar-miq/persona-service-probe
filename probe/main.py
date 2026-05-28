@@ -132,7 +132,7 @@ def probe_persona_v2_create(client: httpx.Client) -> None:
     """POST /v2/personas/ — same body as AMS AQSAdapterImpl v2GeneratePersonas."""
     url = _persona_path("/v2/personas/")
     payload = {
-        "prompt": MOCK_PERSONA_PROMPT,
+        "prompt": "test running shoes",
         "prompt_type": "TEXT",
         "country": "US",
         "language": "EN",
