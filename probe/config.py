@@ -5,12 +5,12 @@ MOCK_PERSONA_PROMPT = "PERSONAS_PROMPT_TO_RETURN_MOCK_VALUES"
 # In-cluster ClusterIP for miq-persona-service (same namespace: ida-integration).
 PERSONA_SERVICE_URL = os.getenv(
     "PERSONA_SERVICE_URL",
-    "http://miq-persona-service.ida-integration.svc.cluster.local",
+    "http://miq-persona-service-integration.ida-integration.svc",
 ).rstrip("/")
 
 EMBEDDING_SERVICE_URL = os.getenv(
     "EMBEDDING_SERVICE_URL",
-    "http://miq-persona-embedding-service-integration.ida-integration.svc.cluster.local/miq-persona-embedding-service",
+    "http://miq-persona-embedding-service-integration.ida-integration.svc/miq-persona-embedding-service",
 ).rstrip("/")
 
 EMBEDDING_SERVICE_BEARER_TOKEN = os.getenv("EMBEDDING_SERVICE_BEARER_TOKEN", "")
