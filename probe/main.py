@@ -18,7 +18,6 @@ import httpx
 from probe.config import (
     EMBEDDING_SERVICE_BEARER_TOKEN,
     EMBEDDING_SERVICE_URL,
-    MOCK_PERSONA_PROMPT,
     PERSONA_API_PREFIX,
     PERSONA_SERVICE_URL,
     PROBE_HTTP_TIMEOUT_SECONDS,
@@ -128,34 +127,63 @@ def _persona_path(suffix: str) -> str:
     return f"{PERSONA_SERVICE_URL}{prefix}{suffix}"
 
 
+_PERSONA_V2_PAYLOAD = {
+    "prompt": "coffee lovers",
+    "prompt_type": "TEXT",
+    "country": "US",
+    "language": "EN",
+    "num_options": 1,
+    "include_segments": False,
+    "include_embedding": False,
+    "num_segment_options": 10,
+    "include_search_terms": True,
+    "num_search_terms_options": 100,
+    "min_search_terms_relevance_score": 0.0,
+}
+
+
 def probe_persona_v2_create(client: httpx.Client) -> None:
-    """POST /v2/personas/ — same body as AMS AQSAdapterImpl v2GeneratePersonas."""
-    url = _persona_path("/v2/personas/")
-    payload = {
-        "prompt": "test running shoes",
-        "prompt_type": "TEXT",
-        "country": "US",
-        "language": "EN",
-        "num_options": 1,
-        "include_segments": False,
-        "num_segment_options": 100,
-        "include_embedding": True,
-        "include_search_terms": False,
-        "num_search_terms_options": 10,
-        "min_search_terms_relevance_score": 0.25,
-    }
-    logger.info("[PROBE-PERSONA] POST %s body=%s", url, json.dumps(payload))
-    response = client.post(url, json=payload)
-    logger.info("[PROBE-PERSONA] v2 personas status=%s", response.status_code)
-    if response.status_code >= 400:
-        logger.error("[PROBE-PERSONA] v2 personas error body=%s", response.text[:8000])
-        response.raise_for_status()
-    body = response.json()
-    logger.info(
-        "[PROBE-PERSONA] v2 personas response summary=%s",
-        json.dumps(_summarize_persona_response(body)),
-    )
-    logger.info("[PROBE-PERSONA] v2 personas full response=%s", json.dumps(body)[:8000])
+    """POST /v2/personas/ twice (wait_for_image=false then true); log duration."""
+    base_url = _persona_path("/v2/personas/")
+
+    for wait_for_image in (False, True):
+        params = {"wait_for_image": str(wait_for_image).lower()}
+        label = f"wait_for_image={wait_for_image}"
+        logger.info(
+            "[PROBE-PERSONA] POST %s params=%s body=%s",
+            base_url,
+            params,
+            json.dumps(_PERSONA_V2_PAYLOAD),
+        )
+        started = time.perf_counter()
+        response = client.post(base_url, params=params, json=_PERSONA_V2_PAYLOAD)
+        elapsed_s = time.perf_counter() - started
+
+        logger.info(
+            "[PROBE-PERSONA] v2 personas (%s) status=%s duration_seconds=%.3f",
+            label,
+            response.status_code,
+            elapsed_s,
+        )
+        if response.status_code >= 400:
+            logger.error(
+                "[PROBE-PERSONA] v2 personas (%s) error body=%s",
+                label,
+                response.text[:8000],
+            )
+            response.raise_for_status()
+
+        body = response.json()
+        logger.info(
+            "[PROBE-PERSONA] v2 personas (%s) response summary=%s",
+            label,
+            json.dumps(_summarize_persona_response(body)),
+        )
+        logger.info(
+            "[PROBE-PERSONA] v2 personas (%s) full response=%s",
+            label,
+            json.dumps(body)[:8000],
+        )
 
 
 def run_probe_cycle() -> None:
