@@ -25,16 +25,6 @@ spec:
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          command:
-            - sh
-            - -c
-            - |
-              if [ -f /vault/secrets/secrets.properties ]; then
-                set -a
-                . /vault/secrets/secrets.properties
-                set +a
-              fi
-              exec python -m probe.main
           envFrom:
             - configMapRef:
                 name: {{ include "persona-connectivity-probe.fullname" . }}-environment
