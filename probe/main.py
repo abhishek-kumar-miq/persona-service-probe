@@ -127,63 +127,106 @@ def _persona_path(suffix: str) -> str:
     return f"{PERSONA_SERVICE_URL}{prefix}{suffix}"
 
 
-_PERSONA_V2_PAYLOAD = {
+_PERSONA_V2_BASE_PAYLOAD: dict[str, Any] = {
     "prompt": "coffee lovers",
     "prompt_type": "TEXT",
     "country": "US",
     "language": "EN",
-    "num_options": 1,
     "include_segments": False,
     "include_embedding": False,
     "num_segment_options": 10,
     "include_search_terms": True,
-    "num_search_terms_options": 100,
-    "min_search_terms_relevance_score": 0.0,
+    "num_search_terms_options": 10,
+    "min_search_terms_relevance_score": 0.25,
 }
+
+# Four persona v2 scenarios exercised each probe cycle.
+_PERSONA_V2_TEST_CASES: list[dict[str, Any]] = [
+    {
+        "num_options": 1,
+        "wait_for_image": False,
+        "label": "testing num_options=1 wait_for_image=false",
+    },
+    {
+        "num_options": 2,
+        "wait_for_image": False,
+        "label": "testing num_options=2 wait_for_image=false",
+    },
+    {
+        "num_options": 3,
+        "wait_for_image": False,
+        "label": "testing num_options=3 wait_for_image=false",
+    },
+    {
+        "num_options": 1,
+        "wait_for_image": True,
+        "label": "testing num_options=1 wait_for_image=true",
+    },
+]
+
+
+def _post_persona_v2(
+    client: httpx.Client,
+    *,
+    base_url: str,
+    num_options: int,
+    wait_for_image: bool,
+    label: str,
+) -> None:
+    payload = {**_PERSONA_V2_BASE_PAYLOAD, "num_options": num_options}
+    params = {"wait_for_image": str(wait_for_image).lower()}
+
+    logger.info("[PROBE-PERSONA] %s — POST %s params=%s body=%s", label, base_url, params, json.dumps(payload))
+    started = time.perf_counter()
+    response = client.post(base_url, params=params, json=payload)
+    elapsed_s = time.perf_counter() - started
+
+    logger.info(
+        "[PROBE-PERSONA] %s — status=%s duration_seconds=%.3f",
+        label,
+        response.status_code,
+        elapsed_s,
+    )
+    if response.status_code >= 400:
+        logger.error(
+            "[PROBE-PERSONA] %s — error body=%s",
+            label,
+            response.text[:8000],
+        )
+        response.raise_for_status()
+
+    body = response.json()
+    logger.info(
+        "[PROBE-PERSONA] %s — response summary=%s",
+        label,
+        json.dumps(_summarize_persona_response(body)),
+    )
+    logger.info(
+        "[PROBE-PERSONA] %s — full response=%s",
+        label,
+        json.dumps(body)[:8000],
+    )
 
 
 def probe_persona_v2_create(client: httpx.Client) -> None:
-    """POST /v2/personas/ twice (wait_for_image=false then true); log duration."""
+    """POST /v2/personas/ for num_options 1/2/3 (async images) then num_options=1 with wait_for_image=true."""
     base_url = _persona_path("/v2/personas/")
 
-    for wait_for_image in (False, True):
-        params = {"wait_for_image": str(wait_for_image).lower()}
-        label = f"wait_for_image={wait_for_image}"
+    for index, case in enumerate(_PERSONA_V2_TEST_CASES, start=1):
         logger.info(
-            "[PROBE-PERSONA] POST %s params=%s body=%s",
-            base_url,
-            params,
-            json.dumps(_PERSONA_V2_PAYLOAD),
+            "[PROBE-PERSONA] starting persona v2 test %s/%s: %s",
+            index,
+            len(_PERSONA_V2_TEST_CASES),
+            case["label"],
         )
-        started = time.perf_counter()
-        response = client.post(base_url, params=params, json=_PERSONA_V2_PAYLOAD)
-        elapsed_s = time.perf_counter() - started
-
-        logger.info(
-            "[PROBE-PERSONA] v2 personas (%s) status=%s duration_seconds=%.3f",
-            label,
-            response.status_code,
-            elapsed_s,
+        _post_persona_v2(
+            client,
+            base_url=base_url,
+            num_options=case["num_options"],
+            wait_for_image=case["wait_for_image"],
+            label=case["label"],
         )
-        if response.status_code >= 400:
-            logger.error(
-                "[PROBE-PERSONA] v2 personas (%s) error body=%s",
-                label,
-                response.text[:8000],
-            )
-            response.raise_for_status()
-
-        body = response.json()
-        logger.info(
-            "[PROBE-PERSONA] v2 personas (%s) response summary=%s",
-            label,
-            json.dumps(_summarize_persona_response(body)),
-        )
-        logger.info(
-            "[PROBE-PERSONA] v2 personas (%s) full response=%s",
-            label,
-            json.dumps(body)[:8000],
-        )
+        logger.info("[PROBE-PERSONA] completed persona v2 test %s/%s: %s", index, len(_PERSONA_V2_TEST_CASES), case["label"])
 
 
 def run_probe_cycle() -> None:
