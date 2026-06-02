@@ -49,6 +49,21 @@ def _summarize_persona_response(body: dict[str, Any]) -> dict[str, Any]:
     return summary
 
 
+def _format_response_for_log(body: dict[str, Any]) -> str:
+    """Serialize response for logging, replacing large image payloads with a size hint."""
+    log_body = json.loads(json.dumps(body))
+    for persona in log_body.get("result") or []:
+        if not isinstance(persona, dict):
+            continue
+        image = persona.get("image")
+        if not isinstance(image, dict):
+            continue
+        b64 = image.get("b64_json")
+        if isinstance(b64, str) and b64:
+            image["b64_json"] = f"<redacted {len(b64)} chars>"
+    return json.dumps(log_body)
+
+
 def _persona_path(suffix: str) -> str:
     prefix = f"/{PERSONA_API_PREFIX}" if PERSONA_API_PREFIX else ""
     return f"{PERSONA_SERVICE_URL}{prefix}{suffix}"
@@ -88,10 +103,11 @@ def _post_persona_v2(
     label = f"num_options={num_options} wait_for_image={str(wait_for_image).lower()}"
 
     logger.info(
-        "[PROBE-PERSONA] request %s/4: POST %s params=%s",
+        "[PROBE-PERSONA] request %s/4: POST %s params=%s body=%s",
         request_index,
         base_url,
         params,
+        json.dumps(payload),
     )
     started = time.perf_counter()
     response = client.post(base_url, params=params, json=payload)
@@ -119,6 +135,12 @@ def _post_persona_v2(
         request_index,
         label,
         json.dumps(_summarize_persona_response(body)),
+    )
+    logger.info(
+        "[PROBE-PERSONA] request %s/4: %s response=%s",
+        request_index,
+        label,
+        _format_response_for_log(body),
     )
     return elapsed_s, response.status_code
 
