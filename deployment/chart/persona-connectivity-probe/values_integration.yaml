@@ -34,7 +34,7 @@ nodeSelector: {}
 tolerations: []
 affinity: {}
 env:
-  PERSONA_SERVICE_URL: http://miq-persona-service.ida-integration.svc/
+  PERSONA_SERVICE_URL: http://miq-persona-service-integration.ida-integration.svc/
   EMBEDDING_SERVICE_URL: http://miq-persona-embedding-service-integration.ida-integration.svc/miq-persona-embedding-service
   PROBE_INTERVAL_SECONDS: '300'
   PROBE_HTTP_TIMEOUT_SECONDS: '120'
