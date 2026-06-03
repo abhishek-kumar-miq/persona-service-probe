@@ -3,6 +3,10 @@
 pipeline {
     agent any
 
+    triggers {
+        githubPush()
+    }
+
     parameters {
         choice(name: 'Environment', choices: ['integration'], description: 'Target environment')
     }
